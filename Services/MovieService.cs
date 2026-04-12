@@ -31,6 +31,7 @@ namespace TMDB_API.Services
              * page 2 will have :  10 Skip, Take 10
              */
             return await _context.Movies
+                .AsNoTracking()
                 .OrderBy(x => x.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -43,6 +44,7 @@ namespace TMDB_API.Services
             if(!_cache.TryGetValue(cacheKey, out List<Movie> movies))
             {
                  movies = await _context.Movies
+                    .AsNoTracking()
                     .OrderByDescending(x => x.VoteCount)
                     .Take(10).ToListAsync();
                 _cache.Set(cacheKey, movies);
@@ -55,6 +57,7 @@ namespace TMDB_API.Services
             var likeQuery = $"%{query}%";
 
             var result = await _context.Movies
+                .AsNoTracking()
                 .Where(m =>
                     EF.Functions.Like(m.Title ?? "", likeQuery) ||
                     EF.Functions.Like(m.Tagline ?? "", likeQuery) ||
