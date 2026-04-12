@@ -98,6 +98,8 @@ public partial class TmdbContext : DbContext
             entity.Property(e => e.VoteCount).HasColumnName("vote_count");
         });
 
+        modelBuilder.Entity<Movie>()
+            .HasIndex(x => x.VoteCount);
         OnModelCreatingPartial(modelBuilder);
     }
 

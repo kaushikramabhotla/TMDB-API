@@ -29,12 +29,12 @@ namespace TMDB_API.Controllers
             var googleId = payload.Subject;
             var email = payload.Email;
             var name = payload.Name;
-
+            var subject = payload.Subject;
 
             // Check User
             var user = await _context
                 .Users
-                .FirstOrDefaultAsync(x => x.Provider == idToken);
+                .FirstOrDefaultAsync(x => x.ProviderUserId == subject);
 
             if(user == null)
             {
