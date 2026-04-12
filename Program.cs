@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using TMDB_API.Repository;
 using TMDB_API.Services;
 
@@ -38,6 +40,25 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
+//Rate-Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("UserPolicy", httpContext =>
+    {
+        var userId = httpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: userId ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,                 // 5 requests
+                Window = TimeSpan.FromSeconds(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            });
+    });
+});
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -53,6 +74,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseResponseCaching();
 
 app.MapControllers();
