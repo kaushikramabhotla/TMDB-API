@@ -14,7 +14,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<TmdbContext>(options => 
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddScoped<IMovieService, MovieService>();
+builder.Services.AddScoped<IMovieService, MovieService>(); 
+builder.Services.AddScoped<UserService>();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
