@@ -57,6 +57,17 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             });
     });
+
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+
+        context.HttpContext.Response.Headers["Retry-After"] = "2";
+
+        await context.HttpContext.Response.WriteAsync(
+            "Too many requests. Please wait before trying again."
+        );
+    };
 });
 
 builder.Services.AddAuthorization();
