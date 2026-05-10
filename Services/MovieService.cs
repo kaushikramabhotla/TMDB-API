@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json;
+using TMDB_API.DTO;
 using TMDB_API.Models;
 using TMDB_API.Repository;
 
@@ -11,16 +14,36 @@ namespace TMDB_API.Services
     {
         private TmdbContext _context;
         private IMemoryCache _cache;
+        private readonly IConfiguration _configuration;
 
-        public MovieService(TmdbContext context, IMemoryCache cache)
+        public MovieService(TmdbContext context, IMemoryCache cache, IConfiguration configuration)
         {
             _context = context;
             _cache = cache;
+            _configuration = configuration;
         }
 
-        public async Task<Movie> GetMovie(int id)
+        public async Task<MovieDto?> GetMovie(int id, Guid userId)
         {
-            return await _context.Movies.FindAsync(id);
+            var favoriteIds = await _context.UserFavorites
+                .Where(f => f.UserId == userId)
+                .Select(f => f.MovieId)
+                .ToHashSetAsync();
+
+            var movie = await _context.Movies
+                .AsNoTracking()
+                .Where(m => m.Id == id)
+                .Select(m => new MovieDto
+                {
+                    Id = m.Id,
+                    Title = m.Title,
+                    Overview = m.Overview,
+                    VoteCount = m.VoteCount,
+                    IsFavorite = favoriteIds.Contains(m.Id)
+                })
+                .FirstOrDefaultAsync();
+
+            return movie;
         }
 
         public async Task<List<Movie>> GetMovies(int page, int pageSize)
@@ -40,50 +63,67 @@ namespace TMDB_API.Services
                 .ToListAsync();
         }
 
-        public async Task<List<Movie>> GetTop10Movies()
+        public async Task<List<MovieDto>> GetTop10Movies(Guid userId)
         {
             string cacheKey = "top10_movies";
-            if(!_cache.TryGetValue(cacheKey, out List<Movie> movies))
+
+            // Step 1: Get cached movies (no user data)
+            if (!_cache.TryGetValue(cacheKey, out List<Movie> movies))
             {
-                 movies = await _context.Movies
+                movies = await _context.Movies
                     .AsNoTracking()
                     .OrderByDescending(x => x.VoteCount)
-                    .Take(10).ToListAsync();
-                _cache.Set(cacheKey, movies);
+                    .Take(10)
+                    .ToListAsync();
+
+                _cache.Set(cacheKey, movies, TimeSpan.FromMinutes(10));
             }
-            return movies;
-        }
 
-        public async Task<List<Movie>> SearchMovies(string query)
-        {
-            var likeQuery = $"%{query}%";
-
-            var result = await _context.Movies
-                .AsNoTracking()
-                .Where(m =>
-                    EF.Functions.Like(m.Title ?? "", likeQuery) ||
-                    EF.Functions.Like(m.Tagline ?? "", likeQuery) ||
-                    EF.Functions.Like(m.Overview ?? "", likeQuery)
-                )
-                .Select(m => new
-                {
-                    Movie = m,
-
-                    Score =
-                        (EF.Functions.Like(m.Title ?? "", likeQuery) ? 3 : 0) +
-                        (EF.Functions.Like(m.Tagline ?? "", likeQuery) ? 2 : 0) +
-                        (EF.Functions.Like(m.Overview ?? "", likeQuery) ? 1 : 0)
-                })
-                .OrderByDescending(x => x.Score)
-                .Select(x => x.Movie)
-                .Take(20)
-
+            foreach (var movie in movies)
+            {
+                await GetPicturePath(movie.Id);
+            }
+            //var user = await _context.Users.Where(u => u.Id == userId);
+            // Step 2: Get user's favorite IDs
+            var favoriteIds = await _context.UserFavorites
+                .Where(f => f.UserId == userId)
+                .Select(f => f.MovieId)
                 .ToListAsync();
+
+            // Step 3: Map to DTO with isFavorite
+            var result = movies.Select(m => new MovieDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                VoteCount = m.VoteCount,
+                Overview = m.Overview,
+                PosterPath = m.PosterPath,
+                BackdropPath = m.BackdropPath,
+                IsFavorite = favoriteIds.Contains(m.Id)
+            }).ToList();
 
             return result;
         }
 
-        public async Task ToggleFavorite(int userId, int movieId)
+        public async Task<List<MovieDto>> Search(string query, Guid userId)
+        {
+            var favoriteIds = await _context.UserFavorites
+                .Where(f => f.UserId == userId)
+                .Select(f => f.MovieId)
+                .ToListAsync();
+
+            return await _context.Movies
+                .Where(m => m.Title.Contains(query))
+                .Select(m => new MovieDto
+                {
+                    Id = m.Id,
+                    Title = m.Title,
+                    IsFavorite = favoriteIds.Contains(m.Id)
+                })
+                .ToListAsync();
+        }
+
+        public async Task ToggleFavorite(Guid userId, int movieId)
         {
             var existing = await _context.UserFavorites
                 .FirstOrDefaultAsync(x => x.UserId == userId && x.MovieId == movieId);
@@ -102,6 +142,56 @@ namespace TMDB_API.Services
             }
 
             await _context.SaveChangesAsync();
+        }
+
+        private async Task<string?> GetPicturePath(int movieId)
+        {
+            if (movieId <= 0)
+                return null;
+
+            var picturePath = await _context.Movies
+                .AsNoTracking()
+                .Where(m => m.Id == movieId)
+                .Select(m => m.PosterPath)
+                .FirstOrDefaultAsync();
+
+            if (!string.IsNullOrEmpty(picturePath))
+            {
+                return picturePath;
+            }
+
+            var client = new HttpClient();
+
+            string tmdbApiKey = _configuration["TMDB:ApiKey"];
+
+            string url =
+                $"https://api.themoviedb.org/3/movie/{movieId}?api_key={tmdbApiKey}";
+
+            var response = await client.GetAsync(url);
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            using JsonDocument doc = JsonDocument.Parse(json);
+
+            string posterPath =
+                doc.RootElement.GetProperty("poster_path").GetString();
+
+            string backdropPath =
+                doc.RootElement.GetProperty("backdrop_path").GetString();
+
+            if (string.IsNullOrEmpty(posterPath))
+                return null;
+
+            var movie = await _context.Movies
+                .FirstOrDefaultAsync(m => m.Id == movieId);
+
+            movie.PosterPath = posterPath;
+
+            movie.BackdropPath = backdropPath;
+
+            await _context.SaveChangesAsync();
+
+            return posterPath;
         }
     }
 }

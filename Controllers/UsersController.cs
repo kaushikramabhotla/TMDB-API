@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TMDB_API.Repository;
 using TMDB_API.Services;
+using TMDB_API.Utils;
 
 namespace TMDB_API.Controllers
 {
@@ -21,7 +22,7 @@ namespace TMDB_API.Controllers
         [HttpGet("favorites")]
         public async Task<IActionResult> Getfavorites()
         {
-            int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            Guid userId = ClaimsExtensions.GetUserId(User);
             return Ok(await _service.ShowFavorites(userId));
         }
     }

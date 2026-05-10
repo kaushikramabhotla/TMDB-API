@@ -12,8 +12,8 @@ using TMDB_API.Repository;
 namespace TMDB_API.Migrations
 {
     [DbContext(typeof(TmdbContext))]
-    [Migration("20260410135117_addeduserProvider")]
-    partial class addeduserProvider
+    [Migration("20260417165239_InitialWithGuid")]
+    partial class InitialWithGuid
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -131,16 +131,16 @@ namespace TMDB_API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("VoteCount");
+
                     b.ToTable("Movies");
                 });
 
             modelBuilder.Entity("TMDB_API.Models.User", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -165,8 +165,8 @@ namespace TMDB_API.Migrations
 
             modelBuilder.Entity("TMDB_API.Models.UserFavorite", b =>
                 {
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("MovieId")
                         .HasColumnType("int");

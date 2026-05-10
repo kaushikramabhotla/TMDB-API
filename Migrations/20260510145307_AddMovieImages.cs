@@ -5,36 +5,34 @@
 namespace TMDB_API.Migrations
 {
     /// <inheritdoc />
-    public partial class addeduserProvider : Migration
+    public partial class AddMovieImages : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "Provider",
-                table: "Users",
+                name: "BackdropPath",
+                table: "Movies",
                 type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "");
+                nullable: true);
 
             migrationBuilder.AddColumn<string>(
-                name: "ProviderUserId",
-                table: "Users",
+                name: "PosterPath",
+                table: "Movies",
                 type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "");
+                nullable: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Provider",
-                table: "Users");
+                name: "BackdropPath",
+                table: "Movies");
 
             migrationBuilder.DropColumn(
-                name: "ProviderUserId",
-                table: "Users");
+                name: "PosterPath",
+                table: "Movies");
         }
     }
 }

@@ -41,6 +41,10 @@ public partial class Movie
 
     public short? VoteCount { get; set; }
 
+    public string? PosterPath { get; set; }
+
+    public string? BackdropPath { get; set; }
+
     // Navigation => which users like this movie
     public ICollection<UserFavorite> FavoritedBy { get; set; }
 }

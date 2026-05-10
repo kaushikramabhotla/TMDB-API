@@ -21,7 +21,6 @@ builder.Services.AddScoped<UserService>();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
-builder.Services.AddResponseCaching();
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
@@ -70,6 +69,17 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReact",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -82,11 +92,11 @@ var app = builder.Build();
 //}
 
 app.UseHttpsRedirection();
+app.UseCors("AllowReact");
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
-app.UseResponseCaching();
 
 app.MapControllers();
 

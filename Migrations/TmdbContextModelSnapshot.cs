@@ -53,6 +53,9 @@ namespace TMDB_API.Migrations
                         .HasColumnType("int")
                         .HasColumnName("id");
 
+                    b.Property<string>("BackdropPath")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("Budget")
                         .HasColumnType("int")
                         .HasColumnName("budget");
@@ -87,6 +90,9 @@ namespace TMDB_API.Migrations
                     b.Property<double?>("Popularity")
                         .HasColumnType("float")
                         .HasColumnName("popularity");
+
+                    b.Property<string>("PosterPath")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateOnly?>("ReleaseDate")
                         .HasColumnType("date")
@@ -135,11 +141,9 @@ namespace TMDB_API.Migrations
 
             modelBuilder.Entity("TMDB_API.Models.User", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -164,8 +168,8 @@ namespace TMDB_API.Migrations
 
             modelBuilder.Entity("TMDB_API.Models.UserFavorite", b =>
                 {
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("MovieId")
                         .HasColumnType("int");

@@ -12,7 +12,7 @@ namespace TMDB_API.Services
         {
             _context = context;
         }
-        public async Task<List<Movie>> ShowFavorites(int userId)
+        public async Task<List<Movie>> ShowFavorites(Guid userId)
         {
             return await _context.UserFavorites
                 .AsNoTracking()

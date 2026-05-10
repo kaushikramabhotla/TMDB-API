@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using TMDB_API.Repository;
 using TMDB_API.Services;
+using TMDB_API.Utils;
 
 namespace TMDB_API.Controllers
 {
@@ -24,10 +25,11 @@ namespace TMDB_API.Controllers
         [EnableRateLimiting("UserPolicy")]
         [ProducesResponseType(200)]
         [ProducesResponseType(500)]
-        [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, NoStore = false)]
         public async Task<IActionResult> getTop10Movies()
         {
-            return Ok(await _movieService.GetTop10Movies());
+            Guid userId = ClaimsExtensions.GetUserId(User);
+
+            return Ok(await _movieService.GetTop10Movies(userId));
         }
 
         [HttpGet("{id:int}")]
@@ -35,7 +37,8 @@ namespace TMDB_API.Controllers
         [EnableRateLimiting("UserPolicy")]
         public async Task<IActionResult> getMovieById(int id)
         {
-            return Ok(await _movieService.GetMovie(id));
+            Guid userId = ClaimsExtensions.GetUserId(User);
+            return Ok(await _movieService.GetMovie(id, userId));
         }
 
         [HttpGet]
@@ -48,9 +51,11 @@ namespace TMDB_API.Controllers
         }
 
         [HttpGet("search")]
+        [Authorize]
         public async Task<IActionResult> SearchMovies([FromQuery] string query)
         {
-            var movies = await _movieService.SearchMovies(query);
+            Guid userid = ClaimsExtensions.GetUserId(User);
+            var movies = await _movieService.Search(query, userid);
             return Ok(movies);
         }
 
@@ -59,7 +64,7 @@ namespace TMDB_API.Controllers
         [EnableRateLimiting("UserPolicy")]
         public async Task<IActionResult> ToggleFavorite([FromBody] int movieId)
         {
-            int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            Guid userId = ClaimsExtensions.GetUserId(User);
 
             await _movieService.ToggleFavorite(userId, movieId);
 
