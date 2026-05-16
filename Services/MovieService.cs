@@ -112,6 +112,7 @@ namespace TMDB_API.Services
                 .Select(f => f.MovieId)
                 .ToListAsync();
 
+
             var movies = await _context.Movies
                 .Where(m => m.Title.Contains(query))
                 .Select(m => new MovieDto
