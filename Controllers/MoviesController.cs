@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using TMDB_API.DTO;
 using TMDB_API.Repository;
 using TMDB_API.Services;
 using TMDB_API.Utils;
@@ -70,5 +71,16 @@ namespace TMDB_API.Controllers
 
             return Ok();
         }
+
+        [HttpGet]
+        [Authorize]
+        [EnableRateLimiting("UserPolicy")]
+        public async Task<List<MovieDto>> GetFavorites()
+        {
+            Guid userId = ClaimsExtensions.GetUserId(User);
+
+            return await _movieService.GetFavorites(userId);
+        }
+
     }
 }

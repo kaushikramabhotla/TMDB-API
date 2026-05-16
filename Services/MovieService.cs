@@ -112,15 +112,24 @@ namespace TMDB_API.Services
                 .Select(f => f.MovieId)
                 .ToListAsync();
 
-            return await _context.Movies
+            var movies = await _context.Movies
                 .Where(m => m.Title.Contains(query))
                 .Select(m => new MovieDto
                 {
                     Id = m.Id,
                     Title = m.Title,
+                    PosterPath = m.PosterPath,
+                    BackdropPath= m.BackdropPath,
                     IsFavorite = favoriteIds.Contains(m.Id)
-                })
+                }).Take(10)
                 .ToListAsync();
+
+            foreach (var movie in movies)
+            {
+                await GetPicturePath(movie.Id);
+            }
+
+            return movies;
         }
 
         public async Task ToggleFavorite(Guid userId, int movieId)
@@ -192,6 +201,24 @@ namespace TMDB_API.Services
             await _context.SaveChangesAsync();
 
             return posterPath;
+        }
+
+        public async Task<List<MovieDto>> GetFavorites(Guid userId)
+        {
+            return await _context.UserFavorites
+
+                .Where(f => f.UserId == userId)
+
+                .Select(f => new MovieDto
+                {
+                    Id = f.Movie.Id,
+                    Title = f.Movie.Title,
+                    PosterPath = f.Movie.PosterPath,
+                    VoteCount = f.Movie.VoteCount,
+                    IsFavorite = true
+                })
+
+                .ToListAsync();
         }
     }
 }
