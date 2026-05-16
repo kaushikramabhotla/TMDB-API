@@ -1,4 +1,5 @@
-﻿using TMDB_API.DTO;
+﻿using Microsoft.AspNetCore.Mvc;
+using TMDB_API.DTO;
 using TMDB_API.Models;
 
 namespace TMDB_API.Services
@@ -10,5 +11,6 @@ namespace TMDB_API.Services
         Task<List<Movie>> GetMovies(int page, int pageSize);
         Task<List<MovieDto>> Search(string query, Guid userId);
         Task ToggleFavorite(Guid userId, int movieId);
+        Task<List<MovieDto>> GetFavorites(Guid userId);
     }
 }
