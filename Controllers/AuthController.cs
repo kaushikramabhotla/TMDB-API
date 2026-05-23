@@ -73,7 +73,7 @@ namespace TMDB_API.Controllers
                     issuer : "TMDB-API",
                     audience: "TMDB-API",
                     claims : claims,
-                    expires : DateTime.UtcNow.AddMinutes(30),
+                    expires : DateTime.UtcNow.AddMinutes(60),
                     signingCredentials : creds
                 );
 

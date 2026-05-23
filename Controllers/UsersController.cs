@@ -91,5 +91,13 @@ namespace TMDB_API.Controllers
 
             return Ok();
         }
+
+        [Authorize]
+        [HttpGet("friends")]
+        public async Task<IActionResult> GetFriends()
+        {
+            var friends = await _userService.GetFriends(User);
+            return Ok(friends);
+        }
     }
 }

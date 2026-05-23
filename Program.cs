@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -22,7 +23,16 @@ builder.Services.AddScoped<UserService>();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
+// Redis
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect("localhost:6379")
+);
+
+// SignalR
 builder.Services.AddSignalR();
+
+// Background notification listener
+builder.Services.AddHostedService<NotificationService>();
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
@@ -78,7 +88,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins("http://localhost:5173")
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
         });
 });
 

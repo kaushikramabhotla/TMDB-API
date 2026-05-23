@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 using System.Security.Claims;
+using System.Text.Json;
 using TMDB_API.DTO;
 using TMDB_API.Models;
 using TMDB_API.Repository;
@@ -11,9 +13,12 @@ namespace TMDB_API.Services
     {
         private TmdbContext _context;
 
-        public UserService(TmdbContext context)
+        private readonly IConnectionMultiplexer _redis;
+
+        public UserService(TmdbContext context, IConnectionMultiplexer redis)
         {
             _context = context;
+            _redis = redis;
         }
         public async Task<List<MovieDto>> ShowFavorites(Guid userId)
         {
@@ -84,8 +89,14 @@ namespace TMDB_API.Services
                                 .Any(fr =>
                                     fr.SenderId == currentUserId &&
                                     fr.ReceiverId== u.Id &&
-                                    fr.Status == "Pending")
-                        })
+                                    fr.Status == "Pending"),
+                        AlreadyFriends =
+                                _context.Friend.Any(f =>
+                                    (f.UserId == currentUserId && f.FriendUserId == u.Id)
+                                    ||
+                                    (f.UserId == u.Id && f.FriendUserId == currentUserId)
+                                )
+                    })
                 .Take(10)
                 .ToListAsync();
         }
@@ -142,32 +153,36 @@ namespace TMDB_API.Services
         {
             Guid receiverId = ClaimsExtensions.GetUserId(principal);
 
+            // BUG FIX: was "pending" lowercase — now matches "Pending"
             var request = await _context.FriendRequest
                 .FirstOrDefaultAsync(fr => fr.SenderId == senderId
                 && fr.ReceiverId == receiverId
-                && fr.Status == "pending");
-            if(request == null)
-            {
-                return false;
-            }
-            request.Status = "Accepted";
+                && fr.Status == "Pending");
 
-            var friendship = new Friend
-            {
-                UserId = senderId,
-                FriendUserId = receiverId,
-            };
+            if (request == null) return false;
 
-            var reverseFriendship = new Friend
-            {
-                UserId = receiverId,
-                FriendUserId = senderId
-            };
+            // Create bidirectional friendship
+            var friendship = new Friend { UserId = senderId, FriendUserId = receiverId };
+            var reverseFriendship = new Friend { UserId = receiverId, FriendUserId = senderId };
 
             _context.Friend.Add(friendship);
             _context.Friend.Add(reverseFriendship);
 
+            // Delete the request from DB after accepting
+            _context.FriendRequest.Remove(request);
+
             await _context.SaveChangesAsync();
+
+            // Publish notification to Redis
+            // The sender (senderId) needs to be notified
+            var subscriber = _redis.GetSubscriber();
+            var payload = JsonSerializer.Serialize(new NotificationPayload
+            {
+                TargetUserId = senderId.ToString(),
+                Type = "accepted",
+                Message = "Your friend request was accepted!"
+            });
+            await subscriber.PublishAsync("notifications", payload);
 
             return true;
         }
@@ -177,20 +192,45 @@ namespace TMDB_API.Services
             var userId = ClaimsExtensions.GetUserId(user);
 
             var request = await _context.FriendRequest
-
                 .FirstOrDefaultAsync(fr =>
                     fr.Id == requestId &&
                     fr.ReceiverId == userId &&
                     fr.Status == "Pending");
 
-            if (request == null)
-                return false;
+            if (request == null) return false;
 
-            request.Status = "Rejected";
+            Guid senderId = request.SenderId;
 
+            // Delete request from DB on rejection
+            _context.FriendRequest.Remove(request);
             await _context.SaveChangesAsync();
 
+            // Notify sender of rejection via Redis
+            var subscriber = _redis.GetSubscriber();
+            var payload = JsonSerializer.Serialize(new NotificationPayload
+            {
+                TargetUserId = senderId.ToString(),
+                Type = "rejected",
+                Message = "Your friend request was declined."
+            });
+            await subscriber.PublishAsync("notifications", payload);
+
             return true;
+        }
+
+        public async Task<List<UserSearchDto>> GetFriends(ClaimsPrincipal principal)
+        {
+            Guid userId = ClaimsExtensions.GetUserId(principal);
+
+            return await _context.Friend
+                .Where(f => f.UserId == userId)
+                .Select(f => new UserSearchDto
+                {
+                    Id = f.FriendUser.Id,
+                    Username = f.FriendUser.Username,
+                    Name = f.FriendUser.Name
+                })
+                .ToListAsync();
         }
     }
 }

@@ -9,5 +9,7 @@
         public string Name { get; set; }
 
         public bool RequestSent { get; set; }
+
+        public bool AlreadyFriends {get; set;}
     }
 }
