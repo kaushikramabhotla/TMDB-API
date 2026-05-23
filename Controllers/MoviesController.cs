@@ -39,7 +39,7 @@ namespace TMDB_API.Controllers
         public async Task<IActionResult> getMovieById(int id)
         {
             Guid userId = ClaimsExtensions.GetUserId(User);
-            return Ok(await _movieService.GetMovie(id, userId));
+            return Ok(await _movieService.GetMovieById(id, userId));
         }
 
         [HttpGet]

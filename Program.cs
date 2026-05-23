@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using TMDB_API.Hubs;
 using TMDB_API.Repository;
 using TMDB_API.Services;
 
@@ -21,6 +22,7 @@ builder.Services.AddScoped<UserService>();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
@@ -99,5 +101,6 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/chatHub");
 
 app.Run();

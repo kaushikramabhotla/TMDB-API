@@ -24,6 +24,8 @@ public partial class TmdbContext : DbContext
     public virtual DbSet<Movie> Movies { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<UserFavorite> UserFavorites { get; set; }
+    public DbSet<FriendRequest> FriendRequest { get; set; }
+    public DbSet<Friend> Friend { get; set; }
 
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -101,6 +103,36 @@ public partial class TmdbContext : DbContext
         modelBuilder.Entity<Movie>()
             .HasIndex(x => x.VoteCount);
         OnModelCreatingPartial(modelBuilder);
+
+        modelBuilder.Entity<FriendRequest>()
+        .HasOne(fr => fr.Sender)
+        .WithMany(u => u.SentRequests)
+        .HasForeignKey(fr => fr.SenderId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+        // FriendRequest Receiver
+        modelBuilder.Entity<FriendRequest>()
+            .HasOne(fr => fr.Receiver)
+            .WithMany(u => u.ReceivedRequests)
+            .HasForeignKey(fr => fr.ReceiverId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // Friend User
+        modelBuilder.Entity<Friend>()
+            .HasOne(f => f.User)
+            .WithMany(u => u.Friends)
+            .HasForeignKey(f => f.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Friend>()
+            .HasOne(f => f.FriendUser)
+            .WithMany()
+            .HasForeignKey(f => f.FriendUserId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<User>()
+        .HasIndex(u => u.Username)
+        .IsUnique();
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

@@ -12,5 +12,9 @@
         public string? PosterPath { get; set; }
 
         public string? BackdropPath { get; set; }
+        public DateOnly? ReleaseDate { get; internal set; }
+        public int? Runtime { get; internal set; }
+        public double? VoteAverage { get; internal set; }
+        public string? Genres { get; internal set; }
     }
 }
