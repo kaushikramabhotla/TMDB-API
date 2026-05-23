@@ -23,14 +23,9 @@ namespace TMDB_API.Services
             _configuration = configuration;
         }
 
-        public async Task<MovieDto?> GetMovie(int id, Guid userId)
+        public async Task<MovieDto?> GetMovieById(int id, Guid userId)
         {
-            var favoriteIds = await _context.UserFavorites
-                .Where(f => f.UserId == userId)
-                .Select(f => f.MovieId)
-                .ToHashSetAsync();
-
-            var movie = await _context.Movies
+            return await _context.Movies
                 .AsNoTracking()
                 .Where(m => m.Id == id)
                 .Select(m => new MovieDto
@@ -38,12 +33,19 @@ namespace TMDB_API.Services
                     Id = m.Id,
                     Title = m.Title,
                     Overview = m.Overview,
+                    PosterPath = m.PosterPath,
+                    BackdropPath = m.BackdropPath,
+                    VoteAverage = m.VoteAverage,
                     VoteCount = m.VoteCount,
-                    IsFavorite = favoriteIds.Contains(m.Id)
+                    Runtime = m.Runtime,
+                    ReleaseDate = m.ReleaseDate,
+                    Genres = m.Genres,
+                    IsFavorite =_context.UserFavorites
+                                .Any(f =>
+                                f.UserId == userId &&
+                                f.MovieId == m.Id)
                 })
                 .FirstOrDefaultAsync();
-
-            return movie;
         }
 
         public async Task<List<Movie>> GetMovies(int page, int pageSize)
@@ -79,10 +81,6 @@ namespace TMDB_API.Services
                 _cache.Set(cacheKey, movies, TimeSpan.FromMinutes(10));
             }
 
-            foreach (var movie in movies)
-            {
-                await GetPicturePath(movie.Id);
-            }
             //var user = await _context.Users.Where(u => u.Id == userId);
             // Step 2: Get user's favorite IDs
             var favoriteIds = await _context.UserFavorites
@@ -124,11 +122,6 @@ namespace TMDB_API.Services
                     IsFavorite = favoriteIds.Contains(m.Id)
                 }).Take(10)
                 .ToListAsync();
-
-            foreach (var movie in movies)
-            {
-                await GetPicturePath(movie.Id);
-            }
 
             return movies;
         }
@@ -183,11 +176,23 @@ namespace TMDB_API.Services
 
             using JsonDocument doc = JsonDocument.Parse(json);
 
-            string posterPath =
-                doc.RootElement.GetProperty("poster_path").GetString();
+            if (!doc.RootElement.TryGetProperty("poster_path", out JsonElement posterElement))
+            {
+                return null;
+            }
 
-            string backdropPath =
-                doc.RootElement.GetProperty("backdrop_path").GetString();
+            string? posterPath =
+                posterElement.GetString();
+
+            string? backdropPath = null;
+
+            if (doc.RootElement.TryGetProperty(
+                    "backdrop_path",
+                    out JsonElement backdropElement))
+            {
+                backdropPath =
+                    backdropElement.GetString();
+            }
 
             if (string.IsNullOrEmpty(posterPath))
                 return null;
