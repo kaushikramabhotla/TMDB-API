@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using TMDB_API.Models.Mongo;
+using TMDB_API.Services;
 
 namespace TMDB_API.Hubs
 {
@@ -6,6 +8,14 @@ namespace TMDB_API.Hubs
     {
         // Called when a user connects — they join a group named by their userId
         // so we can target them specifically
+
+        private readonly MessageService _messageService;
+        private static HashSet<string> OnlineUsers = new();
+
+        public ChatHub(MessageService messageService)
+        {
+            _messageService = messageService;
+        }
         public async Task JoinUserGroup(string userId)
         {
             Console.WriteLine(
@@ -26,6 +36,31 @@ namespace TMDB_API.Hubs
             );
         }
 
+        public override async Task OnConnectedAsync()
+        {
+            var userId = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                OnlineUsers.Add(userId);
+                await Clients.All.SendAsync("UserOnline",userId);
+            }
+
+            await base.OnConnectedAsync();
+        }
+
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            var userId = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                OnlineUsers.Remove(userId);
+                await Clients.All.SendAsync("UserOffline",userId);
+            }
+            await base.OnDisconnectedAsync(exception);
+        }
+
         public async Task SendMessageToFriend(
             string receiverId,
             string senderId,
@@ -40,13 +75,26 @@ namespace TMDB_API.Hubs
 
             Console.WriteLine($"Message: {message}");
 
-            await Clients.Group(receiverId)
-            .SendAsync(
-                "ReceiveDirectMessage",
-                senderId,
-                senderName,
-                message
+            await _messageService.SaveMessage(
+                new ChatMessage
+                {
+                    SenderId = senderId,
+                    ReceiverId = receiverId,
+                    SenderName = senderName,
+                    Message = message,
+                    SentAt = DateTime.UtcNow,
+                    IsRead = false
+                }
             );
+
+            await Clients.Group(receiverId)
+                .SendAsync(
+                    "ReceiveDirectMessage",
+                    senderId,
+                    senderName,
+                    message
+                );
+
 
             Console.WriteLine("MESSAGE SENT TO SIGNALR GROUP");
         }

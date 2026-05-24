@@ -68,9 +68,7 @@ namespace TMDB_API.Services
         {
             Guid currentUserId = ClaimsExtensions.GetUserId(principal);
 
-            query = query
-                .Trim()
-                .ToLower();
+            query = query.Trim().ToLower();
 
             return await _context.Users
                 .Where(u =>
@@ -176,11 +174,18 @@ namespace TMDB_API.Services
             // Publish notification to Redis
             // The sender (senderId) needs to be notified
             var subscriber = _redis.GetSubscriber();
+            var accepter = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    u => u.Id == receiverId
+                );
+
             var payload = JsonSerializer.Serialize(new NotificationPayload
             {
                 TargetUserId = senderId.ToString(),
                 Type = "accepted",
-                Message = "Your friend request was accepted!"
+                Message = $"{accepter.Username} has accepted your friend request!",
+                Time = DateTime.UtcNow
             });
             await subscriber.PublishAsync("notifications", payload);
 

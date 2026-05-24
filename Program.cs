@@ -4,6 +4,7 @@ using StackExchange.Redis;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using TMDB_API;
 using TMDB_API.Hubs;
 using TMDB_API.Repository;
 using TMDB_API.Services;
@@ -27,6 +28,14 @@ builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IConnectionMultiplexer>(
     ConnectionMultiplexer.Connect("localhost:6379")
 );
+
+//MongoDB
+builder.Services.Configure<MongoDbSettings>(
+    builder.Configuration.GetSection(
+        "MongoDbSettings"
+    )
+);
+builder.Services.AddSingleton<MessageService>();
 
 // SignalR
 builder.Services.AddSignalR();

@@ -19,7 +19,7 @@ namespace TMDB_API.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var subscriber = _redis.GetSubscriber();
+            var subscriber = _redis.GetSubscriber(); 
 
             // Subscribe to the "notifications" channel in Redis
             // Whenever something is published here, this fires
@@ -44,5 +44,7 @@ namespace TMDB_API.Services
         public string TargetUserId { get; set; }  // who receives it
         public string Type { get; set; }           // "accepted" or "rejected"
         public string Message { get; set; }
+
+        public DateTime Time { get; set; }
     }
 }
