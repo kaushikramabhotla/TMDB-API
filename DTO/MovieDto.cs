@@ -16,5 +16,7 @@
         public int? Runtime { get; internal set; }
         public double? VoteAverage { get; internal set; }
         public string? Genres { get; internal set; }
+
+        public List<CreditDto> Credits { get; set; }
     }
 }

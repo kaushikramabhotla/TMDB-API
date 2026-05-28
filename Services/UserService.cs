@@ -68,9 +68,7 @@ namespace TMDB_API.Services
         {
             Guid currentUserId = ClaimsExtensions.GetUserId(principal);
 
-            query = query
-                .Trim()
-                .ToLower();
+            query = query.Trim().ToLower();
 
             return await _context.Users
                 .Where(u =>
@@ -104,18 +102,28 @@ namespace TMDB_API.Services
         public async Task<bool> SendFriendrequest(Guid receiverId, ClaimsPrincipal principal)
         {
             Guid senderId = ClaimsExtensions.GetUserId(principal);
-            if(receiverId == senderId)
+            if (receiverId == senderId)
             {
                 return false;
             }
 
             bool alreadyExists = await _context.FriendRequest
-                .AnyAsync
-                (x => x.ReceiverId == receiverId
-                && x.SenderId == senderId
-                && x.Status == "Pending");
+                .AnyAsync(x =>
+                    (x.ReceiverId == receiverId && x.SenderId == senderId)
+                    ||
+                    (x.ReceiverId == senderId && x.SenderId == receiverId)
+                    &&
+                    x.Status == "Pending"
+                );
 
-            if (alreadyExists)
+            bool alreadyFriends = await _context.Friend.AsNoTracking()
+                .AnyAsync(f =>
+                    (f.UserId == senderId && f.FriendUserId == receiverId)
+                    ||
+                    (f.UserId == receiverId && f.FriendUserId == senderId)
+                );
+
+            if (alreadyExists || alreadyFriends)
                 return false;
 
             var request = new FriendRequest
@@ -176,13 +184,20 @@ namespace TMDB_API.Services
             // Publish notification to Redis
             // The sender (senderId) needs to be notified
             var subscriber = _redis.GetSubscriber();
+            var accepter = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    u => u.Id == receiverId
+                );
+
             var payload = JsonSerializer.Serialize(new NotificationPayload
             {
                 TargetUserId = senderId.ToString(),
                 Type = "accepted",
-                Message = "Your friend request was accepted!"
+                Message = $"{accepter.Username} has accepted your friend request!",
+                Time = DateTime.UtcNow
             });
-            await subscriber.PublishAsync("notifications", payload);
+            //await subscriber.PublishAsync("notifications", payload);
 
             return true;
         }
@@ -213,7 +228,7 @@ namespace TMDB_API.Services
                 Type = "rejected",
                 Message = "Your friend request was declined."
             });
-            await subscriber.PublishAsync("notifications", payload);
+            //await subscriber.PublishAsync("notifications", payload);
 
             return true;
         }
