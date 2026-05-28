@@ -1,9 +1,12 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using TMDB_API.Models.Mongo;
 using TMDB_API.Services;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace TMDB_API.Hubs
 {
+    [Authorize]
     public class ChatHub : Hub
     {
         // Called when a user connects — they join a group named by their userId
@@ -38,7 +41,7 @@ namespace TMDB_API.Hubs
 
         public override async Task OnConnectedAsync()
         {
-            var userId = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (!string.IsNullOrEmpty(userId))
             {
@@ -51,7 +54,7 @@ namespace TMDB_API.Hubs
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var userId = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (!string.IsNullOrEmpty(userId))
             {
@@ -63,29 +66,39 @@ namespace TMDB_API.Hubs
 
         public async Task SendMessageToFriend(
             string receiverId,
-            string senderId,
-            string senderName,
             string message)
         {
-            Console.WriteLine( $"SENDING MESSAGE");
 
-            Console.WriteLine($"Receiver Group: {receiverId}");
+            var senderId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            Console.WriteLine( $"Sender: {senderName}");
+            var senderName = Context.User?.FindFirst("username")?.Value;
 
-            Console.WriteLine($"Message: {message}");
+            //Console.WriteLine( $"SENDING MESSAGE");
 
-            await _messageService.SaveMessage(
-                new ChatMessage
-                {
-                    SenderId = senderId,
-                    ReceiverId = receiverId,
-                    SenderName = senderName,
-                    Message = message,
-                    SentAt = DateTime.UtcNow,
-                    IsRead = false
-                }
-            );
+            //Console.WriteLine($"Receiver Group: {receiverId}");
+
+            //Console.WriteLine( $"Sender: {senderName}");
+
+            //Console.WriteLine($"Message: {message}");
+
+            try
+            {
+                await _messageService.SaveMessage(
+                        new ChatMessage
+                        {
+                            SenderId = senderId,
+                            ReceiverId = receiverId,
+                            SenderName = senderName,
+                            Message = message,
+                            SentAt = DateTime.UtcNow,
+                            IsRead = false
+                        }
+                    );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"MONGO SAVE ERROR: {ex}");
+            }
 
             await Clients.Group(receiverId)
                 .SendAsync(

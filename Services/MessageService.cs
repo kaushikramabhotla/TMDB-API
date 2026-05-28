@@ -8,15 +8,13 @@ namespace TMDB_API.Services
     {
         private readonly IMongoCollection<ChatMessage> _messages;
 
-        public MessageService(
-            IOptions<MongoDbSettings> settings)
+        public MessageService(IOptions<MongoDbSettings> settings)
         {
             var mongoClient = new MongoClient(settings.Value.ConnectionString);
 
             var mongoDatabase = mongoClient.GetDatabase(settings.Value.DatabaseName);
 
-            _messages = mongoDatabase.GetCollection<ChatMessage>(
-                        settings.Value.MessagesCollection);
+            _messages = mongoDatabase.GetCollection<ChatMessage>(settings.Value.MessagesCollection);
         }
 
         public async Task SaveMessage(ChatMessage message)

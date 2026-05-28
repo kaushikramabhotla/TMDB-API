@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
@@ -8,6 +9,7 @@ using TMDB_API;
 using TMDB_API.Hubs;
 using TMDB_API.Repository;
 using TMDB_API.Services;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,8 +28,15 @@ builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
 // Redis
 builder.Services.AddSingleton<IConnectionMultiplexer>(
-    ConnectionMultiplexer.Connect("localhost:6379")
+    ConnectionMultiplexer.Connect(
+        builder.Configuration["Redis:ConnectionString"] + ",ssl=True,abortConnect=False"
+    )
 );
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.BackgroundServiceExceptionBehavior =
+        BackgroundServiceExceptionBehavior.Ignore;
+});
 
 //MongoDB
 builder.Services.Configure<MongoDbSettings>(
@@ -44,19 +53,39 @@ builder.Services.AddSignalR();
 builder.Services.AddHostedService<NotificationService>();
 
 builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", options =>
+.AddJwtBearer("Bearer", options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
 
-            ValidIssuer = "TMDB-API",
-            ValidAudience = "TMDB-API",
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes("SECRET_KEY_EXTREME_SIZE_HIGH_SECURITY_KEYS"))
+                ValidIssuer = "TMDB-API",
+                ValidAudience = "TMDB-API",
+
+                IssuerSigningKey =
+                    new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(
+                            "SECRET_KEY_EXTREME_SIZE_HIGH_SECURITY_KEYS"
+                        )
+                    )
+            };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken =  context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -92,13 +121,19 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReact",
+    options.AddPolicy(
+        "AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173")
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
+            policy
+                .WithOrigins(
+                    "http://localhost:5173",
+                    "https://tmdb-lku4by7tz-kaushikramabhotlas-projects.vercel.app",
+                    "https://tmdb-ui-eta.vercel.app"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
         });
 });
 
@@ -114,12 +149,11 @@ var app = builder.Build();
 //}
 
 app.UseHttpsRedirection();
-app.UseCors("AllowReact");
-
+app.UseRouting();
+app.UseCors("AllowFrontend");   // ← MUST be before UseAuthentication and MapHub
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
-
 app.MapControllers();
 app.MapHub<ChatHub>("/chatHub");
 

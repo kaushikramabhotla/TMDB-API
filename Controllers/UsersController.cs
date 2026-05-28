@@ -73,11 +73,16 @@ namespace TMDB_API.Controllers
 
         [Authorize]
         [HttpPost("accept")]
-        public async Task<IActionResult> AcceptRequest(Guid requestId)
+        public async Task<IActionResult> AcceptRequest([FromBody] AcceptRequestDto dto)
         {
-            var requests = await _userService.AcceptFriendRequest(requestId, User);
+            var success = await _userService.AcceptFriendRequest(dto.RequestId, User);
 
-            return Ok(requests);
+            if (!success)
+            {
+                return BadRequest("Could not accept request");
+            }
+
+            return Ok();
         }
 
         [Authorize]

@@ -19,23 +19,35 @@ namespace TMDB_API.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var subscriber = _redis.GetSubscriber(); 
-
-            // Subscribe to the "notifications" channel in Redis
-            // Whenever something is published here, this fires
-            await subscriber.SubscribeAsync("notifications", async (channel, value) =>
+            try
             {
-                var notification = JsonSerializer.Deserialize<NotificationPayload>(value!.ToString()!);
-                if (notification == null) return;
+                var subscriber = _redis.GetSubscriber();
 
-                // Push to the specific user's SignalR group
-                await _hubContext.Clients
-                    .Group(notification.TargetUserId)
-                    .SendAsync("ReceiveNotification", notification.Type, notification.Message);
-            });
+                await subscriber.SubscribeAsync("notifications",
+                    async (channel, message) =>
+                    {
+                        var payload =
+                            JsonSerializer.Deserialize<NotificationPayload>(message.ToString());
 
-            // Keep alive until app shuts down
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+                        if (payload != null)
+                        {
+                            await _hubContext
+                                .Clients
+                                .Group(payload.TargetUserId)
+                                .SendAsync(
+                                    "ReceiveNotification",
+                                    payload.Type,
+                                    payload.Message
+                                );
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Redis subscription failed: {ex.Message}"
+                );
+            }
         }
     }
 

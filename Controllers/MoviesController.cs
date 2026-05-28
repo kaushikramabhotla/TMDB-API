@@ -72,7 +72,7 @@ namespace TMDB_API.Controllers
             return Ok();
         }
 
-        [HttpGet]
+        [HttpGet("favorites")]
         [Authorize]
         [EnableRateLimiting("UserPolicy")]
         public async Task<List<MovieDto>> GetFavorites()
